@@ -1,8 +1,3 @@
-variable "project_name" {
-  description = "Project name prefix"
-  type        = string
-}
-
 variable "source_region" {
   type = string
 }
@@ -11,10 +6,10 @@ variable "destination_region" {
   type = string
 }
 
-variable "source_bucket_name" {
+variable "bucket_name_source" {
   type = string
 }
 
-variable "destination_bucket_name" {
+variable "bucket_name_destination" {
   type = string
 }

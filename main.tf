@@ -1,12 +1,13 @@
-module "s3" {
+module "s3_replication" {
   source = "./modules/s3_module"
 
-  project_name            = var.project_name
-  source_bucket_name      = var.source_bucket_name
-  destination_bucket_name = var.destination_bucket_name
-
   providers = {
-    aws    = aws
-    aws.dr = aws.dr
+    aws      = aws
+    aws.dest = aws.dest
   }
+
+  source_bucket_name      = var.bucket_name_source
+  destination_bucket_name = var.bucket_name_destination
+  source_region           = var.source_region
+  destination_region      = var.destination_region
 }
