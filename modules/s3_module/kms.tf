@@ -1,4 +1,3 @@
-
 data "aws_caller_identity" "current" {}
 
 ############################
@@ -12,7 +11,7 @@ resource "aws_kms_key" "source_key" {
     Version = "2012-10-17"
     Statement = [
 
-      # Root account full control
+      # Root account full access
       {
         Sid    = "RootAccess"
         Effect = "Allow"
@@ -23,23 +22,22 @@ resource "aws_kms_key" "source_key" {
         Resource = "*"
       },
 
-      # Allow S3 replication role to decrypt and generate data keys
+      # Allow replication role to decrypt source objects
       {
-        Sid    = "AllowReplicationDecrypt"
+        Sid    = "AllowReplicationRoleDecrypt"
         Effect = "Allow"
         Principal = {
-          AWS = aws_iam_role.replication_role.arn
+          AWS = aws_iam_role.replication_role_kms.arn
         }
         Action = [
           "kms:Decrypt",
-          "kms:ReEncryptFrom",
-          "kms:DescribeKey",
-          "kms:GenerateDataKey*"
+          "kms:GenerateDataKey*",
+          "kms:DescribeKey"
         ]
         Resource = "*"
-      }
-      ,
-      # Allow S3 service to use the key for replication on behalf of the account
+      },
+
+      # Allow S3 service to use key
       {
         Sid    = "AllowS3ServiceUse"
         Effect = "Allow"
@@ -48,26 +46,14 @@ resource "aws_kms_key" "source_key" {
         }
         Action = [
           "kms:Decrypt",
-          "kms:DescribeKey",
-          "kms:GenerateDataKey*"
+          "kms:GenerateDataKey*",
+          "kms:DescribeKey"
         ]
         Resource = "*"
-        Condition = {
-          StringEquals = {
-            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
-          }
-          ArnLike = {
-            "aws:SourceArn" = [
-              aws_s3_bucket.source.arn,
-              "${aws_s3_bucket.source.arn}/*"
-            ]
-          }
-        }
       }
     ]
   })
 }
-
 
 resource "aws_kms_alias" "source_alias" {
   name          = "alias/s3-source-key"
@@ -86,7 +72,7 @@ resource "aws_kms_key" "destination_key" {
     Version = "2012-10-17"
     Statement = [
 
-      # Root account full control
+      # Root account full access
       {
         Sid    = "RootAccess"
         Effect = "Allow"
@@ -97,12 +83,12 @@ resource "aws_kms_key" "destination_key" {
         Resource = "*"
       },
 
-      # Allow S3 replication role to encrypt, re-encrypt, and generate data keys
+      # Allow replication role to encrypt destination objects
       {
-        Sid    = "AllowReplicationEncrypt"
+        Sid    = "AllowReplicationRoleEncrypt"
         Effect = "Allow"
         Principal = {
-          AWS = aws_iam_role.replication_role.arn
+          AWS = aws_iam_role.replication_role_kms.arn
         }
         Action = [
           "kms:Encrypt",
@@ -111,9 +97,9 @@ resource "aws_kms_key" "destination_key" {
           "kms:DescribeKey"
         ]
         Resource = "*"
-      }
-      ,
-      # Allow S3 service to use the destination key for replication
+      },
+
+      # Allow S3 service to use destination key
       {
         Sid    = "AllowS3ServiceUseDest"
         Effect = "Allow"
@@ -127,17 +113,6 @@ resource "aws_kms_key" "destination_key" {
           "kms:DescribeKey"
         ]
         Resource = "*"
-        Condition = {
-          StringEquals = {
-            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
-          }
-          ArnLike = {
-            "aws:SourceArn" = [
-              aws_s3_bucket.destination.arn,
-              "${aws_s3_bucket.destination.arn}/*"
-            ]
-          }
-        }
       }
     ]
   })
@@ -163,9 +138,9 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "source_encryption
   }
 }
 
-#####################################
-# ENABLE SSE-KMS ON DESTINATION BUCKET
-#####################################
+#################################
+# ENABLE SSE-KMS ON DEST BUCKET
+#################################
 resource "aws_s3_bucket_server_side_encryption_configuration" "destination_encryption" {
   provider = aws.dest
   bucket   = aws_s3_bucket.destination.id
