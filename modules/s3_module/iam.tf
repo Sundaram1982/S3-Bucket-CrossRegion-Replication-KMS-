@@ -17,16 +17,18 @@ resource "aws_iam_policy" "replication_policy_kms" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
-
       # Read from source bucket
       {
+        Sid    = "ProvideReadAccessToSourceBucket"
         Effect = "Allow"
         Action = [
-          "s3:GetReplicationConfiguration",
           "s3:ListBucket",
-          "s3:GetObjectVersion",
+          "s3:GetReplicationConfiguration",
+          "s3:GetObjectVersionForReplication",
           "s3:GetObjectVersionAcl",
-          "s3:GetObjectVersionTagging"
+          "s3:GetObjectVersionTagging",
+          "s3:GetObjectRetention",
+          "s3:GetObjectLegalHold"
         ]
         Resource = [
           aws_s3_bucket.source.arn,
@@ -36,39 +38,51 @@ resource "aws_iam_policy" "replication_policy_kms" {
 
       # Write to destination bucket
       {
+        Sid    = "AllowReplicationToDestinationBucket"
         Effect = "Allow"
         Action = [
           "s3:ReplicateObject",
           "s3:ReplicateDelete",
           "s3:ReplicateTags",
+          "s3:GetObjectVersionTagging",
           "s3:ObjectOwnerOverrideToBucketOwner"
         ]
         Resource = "${aws_s3_bucket.destination.arn}/*"
+        Condition = {
+          StringLikeIfExists = {
+            "s3:x-amz-server-side-encryption" = ["aws:kms", "AES256"]
+          }
+        }
       },
 
-      # KMS source key
+      # Decrypt source objects with KMS conditions
       {
+        Sid    = "AllowDecryptOfSourceObjects"
         Effect = "Allow"
         Action = [
-          "kms:Decrypt",
-          "kms:ReEncryptFrom",
-          "kms:GenerateDataKey*",
-          "kms:DescribeKey"
+          "kms:Decrypt"
         ]
         Resource = aws_kms_key.source_key.arn
+        Condition = {
+          StringLike = {
+            "kms:ViaService" = "s3.${var.source_region}.amazonaws.com"
+          }
+        }
       },
 
-      # KMS destination key
+      # Encrypt destination objects with KMS conditions
       {
+        Sid    = "AllowEncryptOfDestinationObjects"
         Effect = "Allow"
         Action = [
-          "kms:Encrypt",
-          "kms:Decrypt",
-          "kms:ReEncrypt*",
-          "kms:GenerateDataKey*",
-          "kms:DescribeKey"
+          "kms:Encrypt"
         ]
         Resource = aws_kms_key.destination_key.arn
+        Condition = {
+          StringLike = {
+            "kms:ViaService" = "s3.${var.destination_region}.amazonaws.com"
+          }
+        }
       }
     ]
   })
