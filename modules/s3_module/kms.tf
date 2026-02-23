@@ -10,7 +10,6 @@ resource "aws_kms_key" "source_key" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
-
       # Root account full access
       {
         Sid    = "RootAccess"
@@ -22,7 +21,7 @@ resource "aws_kms_key" "source_key" {
         Resource = "*"
       },
 
-      # Allow replication role to decrypt source objects
+      # Allow replication role to decrypt with conditions
       {
         Sid    = "AllowReplicationRoleDecrypt"
         Effect = "Allow"
@@ -30,26 +29,14 @@ resource "aws_kms_key" "source_key" {
           AWS = aws_iam_role.replication_role_kms.arn
         }
         Action = [
-          "kms:Decrypt",
-          "kms:GenerateDataKey*",
-          "kms:DescribeKey"
+          "kms:Decrypt"
         ]
         Resource = "*"
-      },
-
-      # Allow S3 service to use key
-      {
-        Sid    = "AllowS3ServiceUse"
-        Effect = "Allow"
-        Principal = {
-          Service = "s3.amazonaws.com"
+        Condition = {
+          StringLike = {
+            "kms:ViaService" = "s3.${var.source_region}.amazonaws.com"
+          }
         }
-        Action = [
-          "kms:Decrypt",
-          "kms:GenerateDataKey*",
-          "kms:DescribeKey"
-        ]
-        Resource = "*"
       }
     ]
   })
@@ -83,7 +70,7 @@ resource "aws_kms_key" "destination_key" {
         Resource = "*"
       },
 
-      # Allow replication role to encrypt destination objects
+      # Allow replication role to encrypt with conditions
       {
         Sid    = "AllowReplicationRoleEncrypt"
         Effect = "Allow"
@@ -91,28 +78,14 @@ resource "aws_kms_key" "destination_key" {
           AWS = aws_iam_role.replication_role_kms.arn
         }
         Action = [
-          "kms:Encrypt",
-          "kms:ReEncrypt*",
-          "kms:GenerateDataKey*",
-          "kms:DescribeKey"
+          "kms:Encrypt"
         ]
         Resource = "*"
-      },
-
-      # Allow S3 service to use destination key
-      {
-        Sid    = "AllowS3ServiceUseDest"
-        Effect = "Allow"
-        Principal = {
-          Service = "s3.amazonaws.com"
+        Condition = {
+          StringLike = {
+            "kms:ViaService" = "s3.${var.destination_region}.amazonaws.com"
+          }
         }
-        Action = [
-          "kms:Encrypt",
-          "kms:ReEncrypt*",
-          "kms:GenerateDataKey*",
-          "kms:DescribeKey"
-        ]
-        Resource = "*"
       }
     ]
   })
