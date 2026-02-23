@@ -8,17 +8,20 @@ resource "aws_s3_bucket_policy" "source_policy_kms" {
     Version = "2012-10-17"
     Statement = [
 
-      # Allow replication role to read
+      # Allow replication role to read with encryption conditions
       {
         Effect = "Allow"
         Principal = {
           AWS = aws_iam_role.replication_role_kms.arn
         }
         Action = [
-          "s3:GetObjectVersion",
+          "s3:ListBucket",
+          "s3:GetReplicationConfiguration",
+          "s3:GetObjectVersionForReplication",
           "s3:GetObjectVersionAcl",
           "s3:GetObjectVersionTagging",
-          "s3:ListBucket"
+          "s3:GetObjectRetention",
+          "s3:GetObjectLegalHold"
         ]
         Resource = [
           aws_s3_bucket.source.arn,
@@ -64,6 +67,7 @@ resource "aws_s3_bucket_policy" "destination_policy_kms" {
           "s3:ReplicateObject",
           "s3:ReplicateDelete",
           "s3:ReplicateTags",
+          "s3:GetObjectVersionTagging",
           "s3:ObjectOwnerOverrideToBucketOwner"
         ]
         Resource = "${aws_s3_bucket.destination.arn}/*"
